@@ -1,3 +1,12 @@
+# 스프링 데이터 JPA
+
+## 1. 프로젝트 환경설정
+
+### 1-1. 프로젝트 생성
+
+#### build.gradle
+
+```groovy
 plugins {
     id 'org.springframework.boot' version '2.5.2'
     id 'io.spring.dependency-management' version '1.0.11.RELEASE'
@@ -30,3 +39,17 @@ dependencies {
 test {
     useJUnitPlatform()
 }
+
+```
+
+* 아래는 JUnit4를 사용하기 위한 라이브러리 추가 코드
+
+```groovy
+dependencies {
+    testImplementation('org.springframework.boot:spring-boot-starter-test') {
+        exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'
+    }
+}
+```
+
+## Note
