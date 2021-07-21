@@ -97,4 +97,14 @@ dependencies {
     * 로깅 SLF4J & LogBack
     * 테스트
 
+### 1-3. H2 데이터베이스 설치
+
+* 권한 주기: `chmod 755 h2.sh`
+* 데이터베이스 파일 생성 방법
+    * `jdbc:h2:~/datajpa` (최초 한번)
+    * `~/datajpa.mv.db` 파일 생성 확인
+    * 이후 부터는 `jdbc:h2:tcp://localhost/~/datajpa` 이렇게 접속
+
+> 참고: H2 데이터베이스의 MVCC 옵션은 H2 14.198 버전부터 제거되었다.
+
 ## Note
