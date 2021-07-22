@@ -85,4 +85,21 @@ class MemberJpaRepositoryTest {
         assertThat(result.size()).isEqualTo(1);
 
     }
+
+    @Test
+    @DisplayName("NamedQuery 테스트 - 이름으로 회원 조회")
+    public void testNamedQuery() {
+        // given
+        Member m1 = new Member("AAA", 10);
+        Member m2 = new Member("BBB", 20);
+
+        memberJpaRepository.save(m1);
+        memberJpaRepository.save(m2);
+
+        // when
+        List<Member> result = memberJpaRepository.findByUsername("AAA");
+
+        // then
+        assertThat(result).contains(m1);
+    }
 }

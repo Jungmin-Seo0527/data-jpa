@@ -126,4 +126,104 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
 > 그렇지 않으면 애플리케이션을 시작하는 시점에 오류가 발생한다.        
 > 이렇게 애플리케이션 로딩 시점에 오류를 인지할 수 있는 것이 스프링 데이터 JPA의 매우 큰 장점이다.
 
+### 4-2. JPA NamedQuery
+
+JPA의 NamedQuery를 호출할 수 있다.
+
+* `@NamedQuery`어노테이션으로 Named 쿼리 정의
+
+#### Member.java (추가) - NamedQuery 추가
+
+```java
+package study.datajpa.entity;
+
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
+import javax.persistence.JoinColumn;
+import javax.persistence.ManyToOne;
+import javax.persistence.NamedQuery;
+
+import static javax.persistence.FetchType.LAZY;
+import static lombok.AccessLevel.PROTECTED;
+
+@Entity
+@Getter @Setter
+@NoArgsConstructor(access = PROTECTED)
+@ToString(of = {"id", "username", "age"})
+@NamedQuery(
+        name = "Member.findByUsername",
+        query = "select m from Member m where m.username = :username"
+)
+public class Member {
+    // ...
+}
+
+```
+
+#### MemberJpaRepository.java (추가) - JPA를 직접 사용해서 Named 쿼리 호출
+
+```java
+package study.datajpa.repository;
+
+import org.springframework.stereotype.Repository;
+import study.datajpa.entity.Member;
+
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public class MemberJpaRepository {
+
+    @PersistenceContext
+    private EntityManager em;
+
+    // ...
+
+    public List<Member> findByUsername(String username) {
+        return em.createNamedQuery("Member.findByUsername", Member.class)
+                .setParameter("username", username)
+                .getResultList();
+    }
+}
+
+```
+
+#### MemberRepository.java (추가) - 스프링 데이터 JPA로 NamedQuery 사용
+
+```java
+package study.datajpa.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.repository.query.Param;
+import study.datajpa.entity.Member;
+
+import java.util.List;
+
+public interface MemberRepository extends JpaRepository<Member, Long> {
+
+    // ...
+
+    // @Query(name = "Member.findByUsername") // 생략 가능
+    List<Member> findByUsername(@Param("username") String username);
+}
+
+```
+
+* 스프링 데이터 JPA는 선언한 "도메인 클래서 + .(점) + 메서드 이름"으로 Named 쿼리를 찾아서 실행
+* 만약 실행할 Named 쿼리가 없으면 메서드 이름으로 쿼리 생성 전략을 사용한다.
+* 필요하면 전략을 변경할 수 있지만 권장하지는 않는다.
+    * [참고](https://docs.spring.io/spring-data/jpa/docs/current/reference/html/#repositories.query-methods.query-lookup-strategies)
+
+> 참고: 스프링 데이터 JPA를 사용하면 실무에서 named Query를 직접 등록해서 사용하는 일은 드물다.      
+> 대신 `@Query`를 사용해서 리파지토리 메소드에 쿼리를 직접 정의한다.
+
 ## Note
