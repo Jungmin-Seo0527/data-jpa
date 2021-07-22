@@ -4,7 +4,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.annotation.Rollback;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.Sort;
 import org.springframework.transaction.annotation.Transactional;
 import study.datajpa.dto.MemberDto;
 import study.datajpa.entity.Member;
@@ -13,12 +16,13 @@ import study.datajpa.entity.Team;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @Transactional
-@Rollback(false)
+        // @Rollback(false)
 class MemberRepositoryTest {
 
     @Autowired MemberRepository memberRepository;
@@ -178,7 +182,7 @@ class MemberRepositoryTest {
     }
 
     @Test
-    @DisplayName("ddd")
+    @DisplayName("반환 타입 테스트")
     public void returnType() {
         // given
         Member m1 = new Member("AAA", 10);
@@ -200,5 +204,51 @@ class MemberRepositoryTest {
 
         Optional<Member> resultByOptionalNoExit = memberRepository.findOptionalByUsername("adfadf");
         System.out.println("resultByOptionalNoExit = " + resultByOptionalNoExit);
+    }
+
+    @Test
+    @DisplayName("페이징")
+    public void paging() {
+        // given
+        IntStream.range(0, 5).forEach(i -> memberRepository.save(new Member("member" + (i + 1), 10)));
+
+        int age = 10;
+        PageRequest pageRequest = PageRequest.of(0, 3, Sort.Direction.DESC, "username");
+
+        // when
+        Page<Member> page = memberRepository.findByAge(age, pageRequest);
+
+        Page<MemberDto> toMap = page.map(member -> new MemberDto(member.getId(), member.getUsername(), null));
+
+        // then
+        List<Member> content = page.getContent();
+
+        assertThat(content.size()).isEqualTo(3); // 조회된 데이터
+        assertThat(page.getTotalElements()).isEqualTo(5); // 조회된 데이터 수
+        assertThat(page.getNumber()).isEqualTo(0); // 전체 데이터 수
+        assertThat(page.getTotalPages()).isEqualTo(2); // 전체 페이지 번호
+        assertThat(page.isFirst()).isTrue(); // 첫번째 항목인가?
+        assertThat(page.hasNext()).isTrue(); // 다음 페이지가 있는가?
+    }
+
+    @Test
+    @DisplayName("페이징 - slice")
+    public void pagingSlice() {
+        // given
+        IntStream.range(0, 5).forEach(i -> memberRepository.save(new Member("member" + (i + 1), 10)));
+
+        int age = 10;
+        PageRequest pageRequest = PageRequest.of(0, 3, Sort.Direction.DESC, "username");
+
+        // when
+        Slice<Member> page = memberRepository.findSliceByAge(age, pageRequest);
+
+        // then
+        List<Member> content = page.getContent();
+
+        assertThat(content.size()).isEqualTo(3);
+        assertThat(page.getNumber()).isEqualTo(0);
+        assertThat(page.isFirst()).isTrue();
+        assertThat(page.hasNext()).isTrue();
     }
 }

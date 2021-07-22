@@ -483,4 +483,169 @@ class MemberJpaRepositoryTest {
 }
 ```
 
+### 4-8. 스프링 데이터 JPA 페이징과 정렬
+
+* 페이징과 정렬 파라미터
+    * `org.springframework.data.domain.Sort`: 정렬 기능
+    * `org.springframework.data.domain.Pageable`: 페이징 기능(내부에 `Sort` 포함)
+
+* 특별한 반환 타입
+    * `org.springframework.data.domain.Page`: 추가 count 쿼리 결과를 포함하는 페이징
+    * `org.springframework.data.domain.Slice`: 추가 count 쿼리 없이 다음 페이지만 확인 가능(내부적으로 limit + 1 조회)
+    * `List`(자바 컬렉션): 추가 count 쿼리 없이 결과만 반환
+
+* 페이징과 정렬 사용 예제
+
+```
+Page<Member> findByUsername(String name, Pageable pageable); // count 쿼리 사용
+
+Slice<Member> findByUsername(String name, Pageable pageable); // count 쿼리 사용 안함
+
+List<Member> findByUsername(String name, Pageable pageable); // count 쿼리 사용 안함
+
+List<Member> findByUsername(String name, Sort sort);
+```
+
+* 다음 조건으로 페이징과 정렬을 사용하는 예제 코드를 보자.
+    * 검색 조건: 나이가 10살
+    * 정렬 조건: 이름으로 내림차순
+    * 페이징 조건: 첫 번째 페이지, 페이지당 보여줄 데이터는 3건
+
+#### MemberRepository.java (추가) - Page 사용 예제 정의 추가
+
+```java
+package study.datajpa.repository;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import study.datajpa.dto.MemberDto;
+import study.datajpa.entity.Member;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+
+public interface MemberRepository extends JpaRepository<Member, Long> {
+
+    // ...
+
+    Page<Member> findByAge(int age, Pageable pageable);
+}
+
+```
+
+#### MemberRepositoryTest.java - Page 사용 예제 테스트 코드
+
+```java
+public class MemberRepositoryTest {
+
+    // ...
+
+    @Test
+    @DisplayName("페이징")
+    public void paging() {
+        // given
+        IntStream.range(0, 5).forEach(i -> memberRepository.save(new Member("member" + (i + 1), 10)));
+
+        int age = 10;
+        PageRequest pageRequest = PageRequest.of(0, 3, Sort.Direction.DESC, "username");
+
+        // when
+        Page<Member> page = memberRepository.findByAge(age, pageRequest);
+
+        Page<MemberDto> toMap = page.map(member -> new MemberDto(member.getId(), member.getUsername(), null));
+
+        // then
+        List<Member> content = page.getContent();
+
+        assertThat(content.size()).isEqualTo(3);
+        assertThat(page.getTotalElements()).isEqualTo(5);
+        assertThat(page.getNumber()).isEqualTo(0);
+        assertThat(page.getTotalPages()).isEqualTo(2);
+        assertThat(page.isFirst()).isTrue();
+        assertThat(page.hasNext()).isTrue();
+    }
+}
+```
+
+* 두 번째 파라미터로 받은 `Pagable`은 인터페이스다. 따라서 실제 사용할 때는 해당 인터페이스를 구현한 `org.springframework.data.domain.PageRequest`객체를 사용한다.
+* `PageRequest`생성자의 첫 번째 파라미터에는 현재 페이지를 두 번째 파라미터에는 조회할 데이터 수를 입력한다. 여기에 추가로 정렬 정보도 파라미터로 사용할 수 있다. 참고로 페이지는 0부터 시작한다.
+
+> 주의: Page는 1부터 시작이 아니라 0부터 시작이다.
+
+#### Page 인터페이스
+
+```java
+public interface Page<T> extends Slice<T> {
+    int getTotalPages(); //전체 페이지 수
+
+    long getTotalElements(); //전체 데이터 수
+
+    <U> Page<U> map(Function<? super T, ? extends U> converter); //변환기
+}
+```
+
+#### Slice 인터페이스
+
+```java
+public interface Slice<T> extends Streamable<T> {
+    int getNumber(); //현재 페이지
+
+    int getSize(); //페이지 크기
+
+    int getNumberOfElements(); //현재 페이지에 나올 데이터 수
+
+    List<T> getContent(); //조회된 데이터
+
+    boolean hasContent(); //조회된 데이터 존재 여부
+
+    Sort getSort(); //정렬 정보
+
+    boolean isFirst(); //현재 페이지가 첫 페이지 인지 여부
+
+    boolean isLast(); //현재 페이지가 마지막 페이지 인지 여부
+
+    boolean hasNext(); //다음 페이지 여부
+
+    boolean hasPrevious(); //이전 페이지 여부
+
+    Pageable getPageable(); //페이지 요청 정보
+
+    Pageable nextPageable(); //다음 페이지 객체
+
+    Pageable previousPageable();//이전 페이지 객체
+
+    <U> Slice<U> map(Function<? super T, ? extends U> converter); //변환기
+}
+```
+
+#### count 쿼리 분리
+
+```
+@Query(value = "select m from Member m",
+       countQuery = "select count(m.username) from Member m")
+Page<Member> findMemberAllCountBy(Pageable pageable);
+```
+
+* 데이터는 join이 필요하지만 카운터 할때는 join이 필요하지 않는 경우 성능 취적화를 위해서 count 쿼리문을 따로 만들 수 있다.
+
+> 참고: 전체 count 쿼리는 매우 무겁다.
+
+#### Top, First 사용 참고
+
+[참고](https://docs.spring.io/spring-data/jpa/docs/current/reference/html/#repositories.limit-query-result)
+
+`List<Member> findTop3By();`
+
+#### 페이지를 유지하면서 엔티티를 DTO로 변환하기
+
+```
+Page<Member> page = memberRepository.findByAge(10, pageRequest);
+page<MemberDto> dtoPage = page.map(MemberDto::new);
+```
+
 ## Note
