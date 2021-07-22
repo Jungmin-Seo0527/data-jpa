@@ -226,4 +226,34 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
 > 참고: 스프링 데이터 JPA를 사용하면 실무에서 named Query를 직접 등록해서 사용하는 일은 드물다.      
 > 대신 `@Query`를 사용해서 리파지토리 메소드에 쿼리를 직접 정의한다.
 
+### 4-3. @Query, 리포지토리 메소드에 쿼리 정의하기
+
+#### MemberRepository.java (추가) - 메서드에 JPQL 쿼리 작성
+
+```java
+package study.datajpa.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import study.datajpa.entity.Member;
+
+import java.util.List;
+
+public interface MemberRepository extends JpaRepository<Member, Long> {
+
+    // ...
+
+    @Query("select m from Member m where m.username = :username and m.age = :age")
+    List<Member> findUser(@Param("username") String username, @Param("age") int age);
+}
+
+```
+
+* `org.springfrmaework.data.jpa.repository.Query`어노테이션을 사용
+* 실행할 메서드에 정적 쿼리를 직접 작성하므로 이름 없는 Named 쿼리라 할 수 있음
+* JPA Named 쿼리처럼 애플리케이션 실행 시점에 문법 오류를 발견할 수 있음(매우 큰 장점!)
+
+> 참고: 실무에서는 메소드 이름으로 쿼리 생성 기능은 파라미터가 증가하면 메서드 이름이 매우 지저분해진다. 따라서 `@Query`기능을 자주 사용하게 된다.
+
 ## Note
