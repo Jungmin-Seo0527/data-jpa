@@ -256,4 +256,78 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
 
 > 참고: 실무에서는 메소드 이름으로 쿼리 생성 기능은 파라미터가 증가하면 메서드 이름이 매우 지저분해진다. 따라서 `@Query`기능을 자주 사용하게 된다.
 
+### 4-4. @Query, 값, DTO 조회하기
+
+#### MemberRepository.java (추가) - 단순히 값 하나를 조회
+
+```java
+package study.datajpa.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import study.datajpa.dto.MemberDto;
+import study.datajpa.entity.Member;
+
+import java.util.List;
+
+public interface MemberRepository extends JpaRepository<Member, Long> {
+
+    // ...
+
+    @Query("select m.username from Member m")
+    List<String> findUsernameList();
+}
+
+```
+
+* JPA 값 타입 (`@Embedded`)도 이 방식으로 조회할 수 있다.
+
+#### MemberRepository.java (추가) - DTO 로 직접 조회
+
+```java
+package study.datajpa.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import study.datajpa.dto.MemberDto;
+import study.datajpa.entity.Member;
+
+import java.util.List;
+
+public interface MemberRepository extends JpaRepository<Member, Long> {
+
+    // ...
+
+    @Query("select new study.datajpa.dto.MemberDto(m.id, m.username, t.name) from Member m join m.team t")
+    List<MemberDto> findMemberDto();
+}
+
+```
+
+> 주의!       
+> DTO로 직접 조회 하려면 JPA의 `new`명령어를 사용해야 한다. 그리고 다음과 같이 생성자가 맞는 DTO가 필요하다. (JPA와 사용방식이 동일하다.)
+
+#### MemberDto.java
+
+* `src/main/java/study/datajpa/dto/MemberDto.java`
+
+```java
+package study.datajpa.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+
+@Data
+@AllArgsConstructor
+public class MemberDto {
+
+    private Long id;
+    private String username;
+    private String teamName;
+}
+
+```
+
 ## Note
