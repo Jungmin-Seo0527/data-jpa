@@ -330,4 +330,40 @@ public class MemberDto {
 
 ```
 
+### 4-5. 파라미터 바인딩
+
+* 위치 기반
+* 이름 기반
+
+```
+select m from Member m where m.username = ?0 // 위치 기반 
+select m from Member m where m.username = :name // 이름 기반
+```
+
+> 참고: 코드 가독성과 유지보수를 위해 이름 기반 파라미터 바인딩을 사용하자 (위치 기반은 순서 실수가 바꾸면...)
+
+#### MemberRepository.java (추가) - 컬렉션 파라미터 바인딩(Collection 타입으로 in절 지원)
+
+```java
+package study.datajpa.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import study.datajpa.dto.MemberDto;
+import study.datajpa.entity.Member;
+
+import java.util.Collection;
+import java.util.List;
+
+public interface MemberRepository extends JpaRepository<Member, Long> {
+
+    // ...
+
+    @Query("select m from Member m where m.username in :names")
+    List<Member> findByNames(@Param("names") Collection<String> names);
+}
+
+```
+
 ## Note
