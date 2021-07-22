@@ -387,4 +387,100 @@ Optional<Member> findByUsername(String name); // 단건 Optional
 
 > 참고: 단건으로 지정한 메서드를 호출하면 스프링 데이터 JPA는 내부에서 JPQL의 `Query.getSingleReuslt()`메서드를 호출한다. 이 메서드를 호출했을 때 조회 결과가 없으면 `javax.persistence.NoResultException`예외가 발생하는데 개발자 입장에서 다루기가 상당히 불현하다. 스프링 데이터 JPA는 단건을 조회할 때 이 예외가 발생하면 예외를 무시하고 대신에 `null`을 반환한다.
 
+### 4-7. 순수 JPA 페이징과 정렬
+
+JPA에서 페이징을 어떻게 할 것인가?
+
+다음 조건으로 페이징과 정렬을 사용하는 예제 코드를 본다.
+
+* 검색 조건: 나이가 10살
+* 정렬 조건: 이름으로 내림차순
+* 페이징 조건: 첫 번째 페이지, 페이지당 보여줄 데이터는 3건
+
+#### MemberJpaRepository.java (추가) - JPA 페이징 리포지토리 코드
+
+```java
+package study.datajpa.repository;
+
+import org.springframework.stereotype.Repository;
+import study.datajpa.entity.Member;
+
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public class MemberJpaRepository {
+
+    @PersistenceContext
+    private EntityManager em;
+
+    // ...
+
+    public List<Member> findByPage(int age, int offset, int limit) {
+        return em.createQuery("select m from Member m where m.age = :age order by m.username desc", Member.class)
+                .setParameter("age", age)
+                .setFirstResult(offset)
+                .setMaxResults(limit)
+                .getResultList();
+    }
+
+    public long totalCount(int age) {
+        return em.createQuery("select count(m) from Member m where m.age = :age", Long.class)
+                .setParameter("age", age)
+                .getSingleResult();
+    }
+}
+
+```
+
+#### MemberJpaRepositoryTest.java (추가) - JPA 페이징 테스트 코드
+
+```java
+package study.datajpa.repository;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.Rollback;
+import org.springframework.transaction.annotation.Transactional;
+import study.datajpa.entity.Member;
+
+import java.util.List;
+import java.util.stream.IntStream;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+@SpringBootTest
+@Transactional
+@Rollback(false)
+class MemberJpaRepositoryTest {
+
+    @Autowired MemberJpaRepository memberJpaRepository;
+
+    // ...
+
+    @Test
+    @DisplayName("페이징")
+    public void paging() {
+        // given
+        IntStream.rangeClosed(1, 10).forEach(i -> memberJpaRepository.save(new Member("member" + i, 10)));
+
+        int age = 10;
+        int offset = 1;
+        int limit = 3;
+
+        // when
+        List<Member> members = memberJpaRepository.findByPage(age, offset, limit);
+        long totalCount = memberJpaRepository.totalCount(age);
+
+        // then
+        assertThat(members.size()).isEqualTo(3);
+        assertThat(totalCount).isEqualTo(10);
+    }
+}
+```
+
 ## Note

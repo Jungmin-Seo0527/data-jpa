@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import study.datajpa.entity.Member;
 
 import java.util.List;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -101,5 +102,24 @@ class MemberJpaRepositoryTest {
 
         // then
         assertThat(result).contains(m1);
+    }
+
+    @Test
+    @DisplayName("페이징")
+    public void paging() {
+        // given
+        IntStream.rangeClosed(1, 10).forEach(i -> memberJpaRepository.save(new Member("member" + i, 10)));
+
+        int age = 10;
+        int offset = 1;
+        int limit = 3;
+
+        // when
+        List<Member> members = memberJpaRepository.findByPage(age, offset, limit);
+        long totalCount = memberJpaRepository.totalCount(age);
+
+        // then
+        assertThat(members.size()).isEqualTo(3);
+        assertThat(totalCount).isEqualTo(10);
     }
 }
