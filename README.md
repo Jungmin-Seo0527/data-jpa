@@ -902,4 +902,66 @@ public interface MemberRepository extends JpaRepository {
 }
 ```
 
+### 4-11. JPA Hint & Lock
+
+JPA Hint    
+JPA 쿼리 힌트(SQL 힌트가 아니라 JPA 구현체에게 제공하는 힌트)
+
+#### MemberRepository.java (추가) - 쿼리 힌트 사용
+
+```java
+public interface MemberRepository extends JpaRepository<Member, Long> {
+
+    @QueryHints(value = @QueryHint(name = "org.hibernate.readOnly", value = "true"))
+    Member findReadOnlyByUsername(String username);
+} 
+```
+
+#### MemberRepositoryTest.java (추가) - 쿼리 힌트 사용 확인
+
+```java
+public class MemberRepositoryTest {
+    @Test
+    public void queryHint() throws Exception {
+        //given
+        memberRepository.save(new Member("member1", 10));
+        em.flush();
+        em.clear();
+        //when
+        Member member = memberRepository.findReadOnlyByUsername("member1");
+        member.setUsername("member2");
+        em.flush(); //Update Query 실행X
+    }
+}
+```
+
+#### MemberRepsitory.java (추가) - 쿼리 힌트 Page 추가 예제
+
+```java
+public interface MemberRepository extends JpaRepository<Member, Long> {
+
+    @QueryHints(value = @QueryHint(name = "org.hibernate.readOnly", value = "true"))
+    Page<Member> findByUsername(String username, Pagable pageable);
+}
+
+```
+
+* `org.springframework.data.jpa.repository.QueryHints`어노테이션을 사용
+* `forCounting`: 반환 타입으로 `Page` 인터페이스를 적용하면 추가로 호출하는 페이징을 위한 count 쿼리도 쿼리 힌트 적용(기본값`true`)
+
+> 조회할 데이터는 절대 수정 없이 오로직 조회만을 하겠다는 의미이다. 즉 영속성 컨텍스트에서 더티 체킹을 위한 원본 객체를 가지고 있지 않도록 해서 리소스를 최적화 하기 위한 기능이지만...   
+> 별 차이 없다.
+
+#### Lock
+
+```java
+public interface MemberRepository extends JpaRepository<Member, Long> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<Member> findMyUsername(String name);
+}
+```
+
+* `org.springframework.kdata.jpa.repository.Lock`어노테이션 사용
+
 ## Note
