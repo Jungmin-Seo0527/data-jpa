@@ -363,4 +363,15 @@ class MemberRepositoryTest {
 
         // then
     }
+
+    @Test
+    @DisplayName("custom")
+    public void callCustom() {
+        // given
+        List<Member> result = memberRepository.findMemberCustom();
+
+        // when
+
+        // then
+    }
 }
