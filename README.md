@@ -767,4 +767,139 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
 > 1. 영속성 컨텍스트에 엔티티가 없는 상태에서 벌크 연산을 먼저 실행한다.
 > 2. 부득이하게 영속성 컨텍스트에 엔티티가 있으면 벌크 연산 직후 영속성 컨텍스트를 초기화 한다.
 
+### 4-10. @EntityGraph
+
+연관된 엔티티들을 SQL 한번에 조회하는 방법
+
+member -> team 은 지연로딩 관계이다. 따라서 다음과 같이 team의 데이터를 조회할 때 마다 쿼리가 실행된다.(N + 1 문제 발생)
+
+```java
+public class MemberRepositoryTest {
+
+    @Test
+    public void findMemberLazy() throws Exception {
+        //given
+        //member1 -> teamA //member2 -> teamB
+        Team teamA = new Team("teamA");
+        Team teamB = new Team("teamB");
+        teamRepository.save(teamA);
+        teamRepository.save(teamB);
+        memberRepository.save(new Member("member1", 10, teamA));
+        memberRepository.save(new Member("member2", 20, teamB));
+        em.flush();
+        em.clear();
+
+        //when
+        List<Member> members = memberRepository.findAll();
+
+        //then
+        for (Member member : members) {
+            member.getTeam().getName();
+        }
+    }
+}
+
+```
+
+연관된 엔티티를 한번에 조회하려면 페치 조인이 필요하다.
+
+#### MemberRepository.java (추가) - 페치 조인
+
+```java
+package study.datajpa.repository;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import study.datajpa.dto.MemberDto;
+import study.datajpa.entity.Member;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+
+public interface MemberRepository extends JpaRepository<Member, Long> {
+
+    // ...
+
+    @Query("select m from Member m left join fetch m.team")
+    List<Member> findMemberFetchJoin();
+}
+
+```
+
+스프링 데이터 JPA는 JPA가 제공하는 엔티티 그래프 기능을 편리하게 사용하게 도와준다. 이 기능을 사용하면 JPQL 없이 페치 조인을 사용할 수 있다. (JPQL + 엔티티 그래프도 가능)
+
+#### MemberRepository.java (추가) - 데이터 JPA 에서 페치 조인을 사용하는 여러 방법
+
+```java
+package study.datajpa.repository;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import study.datajpa.dto.MemberDto;
+import study.datajpa.entity.Member;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+
+public interface MemberRepository extends JpaRepository<Member, Long> {
+
+    // ...
+
+    // 공통 메서드 오버라이드
+    @Override
+    @EntityGraph(attributePaths = {"team"})
+    List<Member> findAll();
+
+    // JPQL + 엔티티 그래프
+    @EntityGraph(attributePaths = {"team"})
+    @Query("select m from Member m")
+    List<Member> findMemberEntityGraph();
+
+    // 메서드 이름으로 쿼리에서 특히 편리하다.
+    @EntityGraph(attributePaths = {"team"})
+    List<Member> findEntityGraphByUsername(@Param("username") String username);
+}
+
+```
+
+* EntityGraph
+    * 사실상 페치 조인(FETCH JOIN)의 간편 버전
+    * LEFT OUTER JOIN 사용
+
+#### NamedEntityGraph 사용 방법
+
+* 많이 쓰이지는 않는 방법
+
+```java
+@NamedEntityGraph(name = "Member.all",
+        attributeNodes = @NameAttributeNode("team"))
+@Entity
+public class Member {
+
+}
+```
+
+```java
+public interface MemberRepository extends JpaRepository {
+
+    @EntityGraph("Member.all")
+    @Query("select m from Member m")
+    List<Member> findMemberEntityGraph();
+}
+```
+
 ## Note
