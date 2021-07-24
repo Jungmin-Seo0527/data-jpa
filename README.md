@@ -303,4 +303,47 @@ public class BaseEntity extends BaseTimeEntity {
 >
 > 참고로 저장시점에 저장 데이터만 입력하고 싶으면 `@EnableJpaAuditing(modifyOnCreate = false)`옵션을 사용하면 된다.
 
+### 5-3. Web 확장 - 도메인 클래스 컨버터
+
+HTTP 파라미터로 넘어온 엔티티의 아이디로 엔티티 객체를 찾아서 바인딩
+
+#### MemberController.java (추가) - 도메인 클래스 컨버터 사용 전
+
+* `src/main/java/study/datajpa/controller/MemberController.java`
+
+```java
+@RestController
+@RequiredArgsConstructor
+public class MemberController {
+    private final MemberRepository memberRepository;
+
+    @GetMapping("/members/{id}")
+    public String findMember(@PathVariable("id") Long id) {
+        Member member = memberRepository.findById(id).get();
+        return member.getUsername();
+    }
+}
+```
+
+#### MemberController.java (추가) - 도메인 클래스 컨버터 사용 후
+
+```java
+@RestController
+@RequiredArgsConstructor
+public class MemberController {
+    private final MemberRepository memberRepository;
+
+    @GetMapping("/members/{id}")
+    public String findMember(@PathVariable("id") Member member) {
+        return member.getUsername();
+    }
+}
+```
+
+* HTTP 요청은 회원 `id`를 받지만 도메인 클래스 컨버터가 중간에 동작해서 회원 엔티티 객체를 반환
+* 도메인 클래스 컨버터도 리퍼지토리를 사용해서 엔티티를 찾음
+
+> 주의: 도메인 클래스 컨버터로 엔티티를 파라미터로 받으면, 이 엔티티는 단순 조회용으로만 사용해다 한다.    
+> (트랜잭션이 없는 범위에서 엔티티를 조회했으므로, 엔티티를 변경해도 DB에 반영되지 않는다.)
+
 ## Note
