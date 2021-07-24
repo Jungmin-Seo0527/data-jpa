@@ -11,7 +11,6 @@ import study.datajpa.dto.MemberDto;
 import study.datajpa.entity.Member;
 import study.datajpa.repository.MemberRepository;
 
-import javax.annotation.PostConstruct;
 import java.util.stream.IntStream;
 
 @RestController
@@ -42,7 +41,7 @@ public class MemberController {
                 .map(MemberDto::new);
     }
 
-    @PostConstruct
+    // @PostConstruct
     public void init() {
         IntStream.range(0, 100).mapToObj(i -> new Member("user" + i, i)).forEach(memberRepository::save);
     }
