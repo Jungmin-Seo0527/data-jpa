@@ -119,4 +119,188 @@ public class MemberRepositoryCustomImpl implements MemberRepsitoryCustom {
 기존 방식보다 이 방식이 사용자 정의 인터페이스 이름과 구현 클래스 이름이 비슷하므로 더 직관적이다.    
 추가로 여러 인터페이스를 분리해서 구현하는 것도 가능하기 때문에 새롭게 변경된 이 방식을 사용하는 것을 더 권장한다.
 
+### 5-2. Auditing
+
+* 엔티티를 생성, 변경할 때 변경한 사람과 시간을 추적하고 싶으면?
+    * 등록일
+    * 수정일
+    * 등록자
+    * 수정자
+
+#### JpaBaseEntity.java - 순수 JPA 사용
+
+* `src/main/java/study/datajpa/entity/JpaBaseEntity.java`
+
+```java
+package study.datajpa.entity;
+
+import lombok.Getter;
+
+import javax.persistence.Column;
+import javax.persistence.MappedSuperclass;
+import javax.persistence.PrePersist;
+import javax.persistence.PreUpdate;
+import java.time.LocalDateTime;
+
+@MappedSuperclass
+@Getter
+public class JpaBaseEntity {
+
+    @Column(updatable = false)
+    private LocalDateTime createDate;
+    private LocalDateTime updateDate;
+
+    @PrePersist
+    public void prePersist() {
+        LocalDateTime now = LocalDateTime.now();
+        createDate = now;
+        updateDate = now;
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        updateDate = LocalDateTime.now();
+    }
+}
+
+```
+
+#### MemberTest.java (추가) - JpaBaseEntity 테스트
+
+```java
+public class MemberTest {
+    @Test
+    @DisplayName("BaseTimeEntity 테스트")
+    public void JpaEventBaseEntity() throws Exception {
+        // given
+        Member member = new Member("member1");
+        memberRepository.save(member); // @PrePersist
+
+        Thread.sleep(100);
+        member.setUsername("member2");
+
+        em.flush(); // @PreUpdate
+        em.clear();
+
+        // when
+        Member findMember = memberRepository.findById(member.getId()).orElseThrow();
+
+        // then
+        System.out.println("findMember.getCreateDate() = " + findMember.getCreateDate());
+        System.out.println("findMember.getUpdateDate() = " + findMember.getLastModifiedDate());
+    }
+}
+```
+
+* JPA 주요 이벤트 어노테이션
+    * `@PrePersist`, `@PostPersist`
+    * `@PreUpdate`, `@PostUpdate`
+
+#### 스프링 데이터 JPA 사용
+
+* 설정
+    * `@EnableJpaAuditing` -> 스프링 부트 설정 클래스에 적용해야 함
+    * `@EntityListeners(AuditingEntityListener.class)` -> 엔티티에 적용
+
+* 사용 어노테이션
+    * `@CreatedDate`
+    * `@LastModifiedDate`
+    * `@CreateBy`
+    * `@LastModifiedBy`
+
+#### BaseEntity.java - 스프링 데이터 Auditing 적용: 등록일, 수정일
+
+* `src/main/java/study/datajpa/entity/BaseEntity.java`
+
+```java
+package study.datajpa.entity;
+
+@EntityListeners(AuditingEntityListener.class)
+@MappedSuperclass
+@Getter
+public class BaseEntity {
+    @CreatedDate
+    @Column(updatable = false)
+    private LocalDateTime createdDate;
+    @LastModifiedDate
+    private LocalDateTime lastModifiedDate;
+}
+
+```
+
+#### BaseEntity.java (추가) - 등록자, 수정자
+
+```java
+package jpabook.jpashop.domain;
+
+@EntityListeners(AuditingEntityListener.class)
+@MappedSuperclass
+public class BaseEntity {
+    @CreatedDate
+    @Column(updatable = false)
+    private LocalDateTime createdDate;
+    @LastModifiedDate private LocalDateTime lastModifiedDate;
+    @CreatedBy
+    @Column(updatable = false)
+    private String createdBy;
+    @LastModifiedBy
+    private String lastModifiedBy;
+}
+```
+
+#### DataJpaApplication.java - 등록자, 수정자를 처리해주는 `AuditorAware`스프링 빈 등록
+
+```java
+package study.datajpa;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Bean;
+import org.springframework.data.domain.AuditorAware;
+import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
+
+import java.util.Optional;
+import java.util.UUID;
+
+@EnableJpaAuditing
+@SpringBootApplication
+public class DataJpaApplication {
+
+    // ...
+
+    @Bean
+    public AuditorAware<String> auditorProvider() {
+        return () -> Optional.of(UUID.randomUUID().toString());
+    }
+}
+
+```
+
+실무에서는 세션 정보나, 스프링 시큐리티 로그인 정보에서 ID를 받음
+
+> 참고: 실무에서 대부분의 엔티티는 등록시간, 수정시간이 필요하지만, 등록자, 수정자는 없을 수도 있다.     
+> 그래서 다름과 같이 Base 타입을 분리하고, 원하는 타입을 선택해서 상속한다.
+
+```java
+public class BaseTimeEntity {
+    @CreatedDate
+    @Column(updatable = false)
+    private LocalDateTime createdDate;
+    @LastModifiedDate
+    private LocalDateTime lastModifiedDate;
+}
+
+public class BaseEntity extends BaseTimeEntity {
+    @CreatedBy
+    @Column(updatable = false)
+    private String createdBy;
+    @LastModifiedBy
+    private String lastModifiedBy;
+}
+```
+
+> 참고: 저장시점에 등록일, 등록자는 물론이고, 수정일, 수정자도 같은 데이터가 저장된다. 데이터가 중복 저장되는 것 같지만, 이렇게 해두면 변경 컬럼만 확인해도 마지막에 업데이트한 유저를 확인할 수 있으므로 유지보수 관점에서 편리하다. 이렇게 하지 않으면 변경 컬럼이 `null`일때 등록 컬럼을 또 찾아야 한다.
+>
+> 참고로 저장시점에 저장 데이터만 입력하고 싶으면 `@EnableJpaAuditing(modifyOnCreate = false)`옵션을 사용하면 된다.
+
 ## Note
