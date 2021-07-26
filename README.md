@@ -312,5 +312,60 @@ where
     * 프로젝션 대상이 root 엔티티를 넘어가면 JPQL SELECT 최적화가 안된다!
     * 실무의 복잡한 쿼리를 해결하기에는 한계가 있다.
     * 실무에서는 단순할 때만 사용하고, 조금만 복잡해지면 QueryDSL을 사용하자.
-    
+
+### 7-4. 네이티브 쿼리
+
+가급적 네이티브 쿼리는 사용하지 않는게 좋음, 정말 어쩔 수 없을 때 사용       
+최근에 나온 궁극의 방법 -> 스프링 데이터 Projections 활용
+
+#### 스프링 데이터 JPA 기반 네이티브 쿼리
+
+* 페이징 지원
+* 반환 타입
+    * Object[]
+    * Tuple
+    * DTO(스프링 데이터 인터페이스 Projections 지원)
+* 제약
+    * Sort 파라미터를 통한 정렬이 정상 동작하지 않을 수 있음(믿지 말고 직접 처리)
+    * JPQL처럼 애플리케이션 로딩 시점에 문법 확인 불가
+    * 동적 쿼리 불가
+
+#### JPA 네이티브 SQL 지원
+
+```java
+public interface MemberRepository extends JpaRepository<Member, Long> {
+
+    @Query(value = "select * from member where username = ?", nativeQuery = true)
+    Member findByNativeQuery(String username);
+}
+```
+
+* JPQL은 위치 기반 파라미터를 1부터 시작하지만 네이티브 SQL은 0부터 시작
+* 네이티브 SQL을 엔티티가 아닌 DTO로 변환 하려면
+    * DTO 대신 JPQ TUPLE 조회
+    * DTO 대신 MAP 조회
+    * `@SqlResultSetMapping` -> 복잡
+    * Hibernate ResultTransformer를 사용해야 함 -> 복잡
+    * https://vladmihalcea.com/the-best-way-to-map-a-projection-query-to-a-dto-with-jpa-and-hibernate/
+    * 네이티브 SQL을 DTO로 조회할 때는 JdbcTemplate or myBatis 권장
+
+#### Projections 활용
+
+예) 스프링 데이터 JPA 네이티브 쿼리 + 인터페이스 기반 Projections 활용
+
+```java
+public interface MemberRepository extends JpaRepository<Member, Long> {
+
+    @Query(value = "select m.member_id as id, m.username, t.name as teamName " +
+            "from member m left join team t",
+            countQuery = "select count(*) from member",
+            nativeQuery = true)
+    Page<MemberProjection> findByNativeProjection(Pageable pageable);
+}
+```
+
+* 동적 네이티브 쿼리
+    * 하이버네이트를 직접 사용
+    * 스프링 JdbcTemplate, myBatis, jooq같은 외부 라이브러리 사용
+
 ## Note
